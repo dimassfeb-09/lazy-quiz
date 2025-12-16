@@ -1,0 +1,75 @@
+# ===================================================================
+#  File Konfigurasi Rahasia (Secrets)
+# ===================================================================
+# Ini adalah baris PALING PENTING. Jangan pernah mengirimkan kredensial,
+# kata sandi, atau API key ke repositori Git.
+.env
+
+
+# ===================================================================
+#  Output yang Dihasilkan oleh Skrip
+# ===================================================================
+# Direktori ini berisi semua hasil scrape dan jawaban AI.
+# Ini adalah data yang dihasilkan, bukan kode sumber, jadi harus diabaikan.
+output/
+
+# File sesi atau cookie yang mungkin dibuat selama pengembangan
+session.json
+cookies.json
+
+
+# ===================================================================
+#  Dependensi & Lingkungan Virtual Python
+# ===================================================================
+# Abaikan folder lingkungan virtual
+.venv/
+venv/
+env/
+
+# Abaikan file cache Python dan bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# File distribusi dan packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+
+# ===================================================================
+#  File Spesifik IDE & Editor Kode
+# ===================================================================
+# Visual Studio Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+
+# ===================================================================
+#  File Sistem Operasi
+# ===================================================================
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+
+# ===================================================================
+#  File Log
+# ===================================================================
+# Meskipun skrip saat ini tidak membuat log, ini adalah praktik yang baik
+# untuk mengabaikannya jika Anda menambahkannya nanti.
+*.log
+logs/
+
+cache/
