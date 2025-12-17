@@ -1,4 +1,4 @@
-# Lazy Quiz v2.0 - Bot Otomatis Kuis Moodle (Playwright Version)
+# Lazy Quiz v3.0 - Bot Otomatis Kuis Moodle (Playwright Version)
 
 ## Pendahuluan
 
@@ -28,7 +28,7 @@ Proyek ini tetap terintegrasi dengan **Google Gemini AI** untuk menganalisis dan
 
 ---
 
-## ✨ Fitur Baru (v2.0)
+## ✨ Fitur Baru (v3.0)
 
 - **Playwright Browser Automation:** Login dan navigasi halaman dilakukan menggunakan Playwright dengan anti-detection features.
 - **Auto-Fill & Save (Safe Mode):**

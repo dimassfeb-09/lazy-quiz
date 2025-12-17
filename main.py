@@ -1,11 +1,11 @@
 # main.py (Support Continuous Loop / Multi-Block Exam)
 # Copyright (C) 2025 Julius W. (@jtnqr)
 
-import argparse
 import json
 import os
 import time
 
+import typer
 from dotenv import load_dotenv
 
 import utils.ai_utils as ai
@@ -182,26 +182,46 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
             qz.close()
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Lazy Quiz Bot v3 (Continuous)")
-    parser.add_argument("--url", help="URL kuis")
-    parser.add_argument("--scrape-only", action="store_true", help="Hanya scrape")
-    parser.add_argument("--no-cache", action="store_true", help="Abaikan cache")
-    parser.add_argument(
-        "--auto-submit", action="store_true", help="Auto submit tanpa tanya"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Tes koneksi")
-    args = parser.parse_args()
+def main(
+    url: str = typer.Option(None, "--url", help="Quiz URL to process"),
+    scrape_only: bool = typer.Option(
+        False, "--scrape-only", help="Only scrape questions, don't answer"
+    ),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Ignore cached questions"),
+    auto_submit: bool = typer.Option(
+        False, "--auto-submit", help="Auto submit without confirmation"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Test connection only"),
+    answer_file: str = typer.Option(
+        None, "--answer-file", help="Use answers from JSON file"
+    ),
+):
+    """
+    Lazy Quiz - Automated quiz solver for Moodle and ASP.NET platforms.
 
+    Uses Playwright browser automation and Google Gemini AI to automatically
+    answer quiz questions. For educational and research purposes only.
+    """
     load_dotenv()
     moodle_username = os.environ.get("MOODLE_USERNAME")
     moodle_password = os.environ.get("MOODLE_PASSWORD")
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
     gemini_model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
-    if args.url:
+    # Create args object for compatibility with run_quiz_process
+    class Args:
+        pass
+
+    args = Args()
+    args.scrape_only = scrape_only
+    args.no_cache = no_cache
+    args.auto_submit = auto_submit
+    args.dry_run = dry_run
+    args.answer_file = answer_file
+
+    if url:
         run_quiz_process(
-            args.url,
+            url,
             args,
             moodle_username,
             moodle_password,
@@ -209,8 +229,8 @@ def main():
             gemini_model,
         )
     else:
-        # Interactive mode simple
-        raw_url = input("Masukkan URL Kuis: ")
+        # Interactive mode
+        raw_url = typer.prompt("Masukkan URL Kuis")
         if raw_url:
             run_quiz_process(
                 raw_url.strip(),
@@ -223,4 +243,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)
