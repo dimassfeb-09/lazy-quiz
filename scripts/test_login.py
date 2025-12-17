@@ -28,10 +28,15 @@ def test_login(url=None):
         return
 
     if not url:
-        # Try to get from .env first
-        url = os.environ.get("MOODLE_URL", "").strip()
+        # Try to get base URL from .env first
+        base_url = os.environ.get("MOODLE_URL", "").strip()
 
-        if not url:
+        if base_url:
+            # Append /login to base URL
+            url = base_url.rstrip("/") + "/login"
+            logger.info(f"Using MOODLE_URL from .env: {url}")
+        else:
+            # Prompt user for URL
             url = input("Enter login URL: ").strip()
             if not url:
                 url = "https://your-moodle-site.edu/login/index.php"
@@ -62,15 +67,15 @@ def test_login(url=None):
 
             # Check if login was successful
             if "Dashboard" in page.title() or "My courses" in page.title():
-                logger.info("\n" + "=" * 40)
+                logger.info("=" * 20)
                 logger.info("  LOGIN SUCCESSFUL!")
-                logger.info("=" * 40)
+                logger.info("=" * 20)
                 logger.info(f"Current URL: {page.url}")
                 logger.info(f"Page title: {page.title()}")
             else:
-                logger.info("\n" + "=" * 40)
+                logger.info("=" * 20)
                 logger.info("  LOGIN FAILED")
-                logger.info("=" * 40)
+                logger.info("=" * 20)
                 logger.info(f"Current URL: {page.url}")
                 logger.info(
                     "Check your credentials or update LOGIN_URL for your Moodle instance."
