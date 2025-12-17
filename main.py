@@ -9,6 +9,7 @@ import typer
 from dotenv import load_dotenv
 
 import utils.ai_utils as ai
+from utils.logger import logger
 from utils.scraper_exam import ExamScraper
 from utils.scraper_moodle import MoodleScraper
 
@@ -30,7 +31,7 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
     try:
         # 1. Start Browser (Hanya sekali di awal)
         ScraperClass = get_scraper_class(url)
-        print(f"Menginisialisasi Driver: {ScraperClass.__name__}")
+        logger.info(f"Initializing scraper: {ScraperClass.__name__}")
         qz = ScraperClass(url, username, password)
 
         part_counter = 1  # Untuk penamaan file cache per bagian (Bagian 1, 2, dst)
@@ -41,10 +42,8 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                 real_part = qz.get_current_block()
                 if real_part > 0:
                     part_counter = real_part
-                    print(
-                        f"[Info] Terdeteksi halaman Website berada di BAGIAN {part_counter}"
-                    )
-            print(f"\n>>> MEMULAI PROSES: BAGIAN / PUTARAN KE-{part_counter} <<<")
+                    logger.info(f"Detected current section: Part {part_counter}")
+            logger.info(f"\n>>> STARTING PROCESS: PART {part_counter} <<<")
 
             # Reset memori scraper agar bersih untuk bagian baru
             qz.reset_quiz_data()
@@ -69,7 +68,7 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
             # --- FASE 1: SCRAPING SOAL ---
             # Cek apakah ada cache lokal untuk PART ini
             if os.path.exists(cache_file) and not args.no_cache:
-                print(f"Cache Soal ditemukan! Memuat dari '{cache_file}'...")
+                logger.info(f"Questions cache found! Loading from '{cache_file}'...")
                 with open(cache_file, "r") as f:
                     qz_quizzes = json.load(f)
                 qz.set_quiz_data(qz_quizzes)
@@ -80,10 +79,8 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
 
                 # --- CHECKPOINT KELUAR LOOP ---
                 if not qz_quizzes:
-                    print("\n[INFO] Tidak ditemukan soal lagi pada halaman ini.")
-                    print(
-                        "Kemungkinan seluruh ujian telah selesai atau berada di halaman Summary."
-                    )
+                    logger.info("\nNo more questions found on this page.")
+                    logger.info("Likely all sections complete or on summary page.")
                     break  # KELUAR DARI LOOP WHILE
 
                 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -92,7 +89,7 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
 
             # --- FASE 2: LOAD JAWABAN (AI) ---
             if args.scrape_only:
-                print("Mode --scrape-only aktif. Berhenti di sini.")
+                logger.info("--scrape-only mode active. Stopping here.")
                 break
 
             questions_for_ai = {
@@ -104,7 +101,9 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
             answers_from_ai = {}
             # Cek Cache Jawaban
             if os.path.exists(answer_cache_file) and not args.no_cache:
-                print(f"Cache Jawaban ditemukan! Memuat dari '{answer_cache_file}'...")
+                logger.info(
+                    f"Answers cache found! Loading from '{answer_cache_file}'..."
+                )
                 with open(answer_cache_file, "r") as f:
                     answers_from_ai = json.load(f)
             # Tanya AI
@@ -121,9 +120,9 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
 
             # --- FASE 3: PENGISIAN & SUBMIT ---
             if answers_to_fill:
-                print("\n" + "=" * 40)
-                print(f"MENGISI BAGIAN {part_counter}...")
-                print("=" * 40)
+                logger.info("\n" + "=" * 40)
+                logger.info(f"FILLING SECTION {part_counter}...")
+                logger.info("=" * 40)
 
                 filled_ids = qz.save_answers(answers_to_fill)
 
@@ -131,7 +130,7 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                 total_soal = len(qz_quizzes)
                 total_terisi = len(filled_ids)
                 total_gagal = total_soal - total_terisi
-                print(f"Statistik: {total_terisi}/{total_soal} Terisi.")
+                logger.info(f"Statistics: {total_terisi}/{total_soal} Filled.")
 
                 # Logic Konfirmasi
                 do_submit = False
@@ -157,23 +156,23 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                         break  # Stop loop
 
                 if do_submit:
-                    print(f"\n[Action] Submit Bagian {part_counter}...")
+                    logger.info(f"\n[Action] Submitting Part {part_counter}...")
                     qz.submit_final()
 
                     # Beri waktu napas untuk loading halaman baru
-                    print("Menunggu loading halaman Bagian selanjutnya...")
+                    logger.info("Waiting for next section to load...")
                     time.sleep(5)
 
                     # Increment counter untuk loop berikutnya
                     part_counter += 1
             else:
-                print("Tidak ada jawaban untuk diisi.")
+                logger.warning("No answers to fill.")
                 break
 
-        print("\n=== SEMUA PROSES SELESAI ===")
+        logger.info("\n=== ALL PROCESSES COMPLETE ===")
 
     except Exception as e:
-        print(f"\n--- TERJADI ERROR ---: {e}")
+        logger.error(f"\n--- ERROR OCCURRED ---: {e}")
         import traceback
 
         traceback.print_exc()
