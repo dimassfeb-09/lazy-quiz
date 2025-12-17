@@ -13,6 +13,11 @@ from utils.logger import logger
 from utils.scraper_exam import ExamScraper
 from utils.scraper_moodle import MoodleScraper
 
+# Create Typer app
+app = typer.Typer(
+    help="Lazy Quiz - Automated quiz solver for Moodle and ASP.NET platforms"
+)
+
 CACHE_DIR = "cache"
 
 
@@ -141,8 +146,8 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                     if is_safe:
                         prompt = f"Semua soal Bagian {part_counter} terisi. Lanjut Submit & Next Bagian? (y/n): "
                     else:
-                        print(
-                            f"⚠️ Peringatan: Ada {total_gagal} soal kosong di Bagian {part_counter}!"
+                        logger.warning(
+                            f"⚠️  Warning: {total_gagal} questions empty in Part {part_counter}!"
                         )
                         prompt = "Paksa Submit & Lanjut? (ketik 'force' / 'n'): "
 
@@ -150,7 +155,7 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                     if (is_safe and choice in ["y", "yes"]) or choice == "force":
                         do_submit = True
                     else:
-                        print(
+                        logger.info(
                             "User membatalkan submit. Bot berhenti (Session Browser tetap terbuka sebentar)."
                         )
                         break  # Stop loop
@@ -181,7 +186,8 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
             qz.close()
 
 
-def main(
+@app.command("run")
+def run_command(
     url: str = typer.Option(None, "--url", help="Quiz URL to process"),
     scrape_only: bool = typer.Option(
         False, "--scrape-only", help="Only scrape questions, don't answer"
@@ -196,10 +202,9 @@ def main(
     ),
 ):
     """
-    Lazy Quiz - Automated quiz solver for Moodle and ASP.NET platforms.
+    Run the quiz automation (default command).
 
-    Uses Playwright browser automation and Google Gemini AI to automatically
-    answer quiz questions. For educational and research purposes only.
+    Automatically solves quiz questions using Playwright and Gemini AI.
     """
     load_dotenv()
     moodle_username = os.environ.get("MOODLE_USERNAME")
@@ -207,7 +212,7 @@ def main(
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
     gemini_model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
-    # Create args object for compatibility with run_quiz_process
+    # Create args object for compatibility
     class Args:
         pass
 
@@ -229,7 +234,7 @@ def main(
         )
     else:
         # Interactive mode
-        raw_url = typer.prompt("Masukkan URL Kuis")
+        raw_url = typer.prompt("Enter Quiz URL")
         if raw_url:
             run_quiz_process(
                 raw_url.strip(),
@@ -241,5 +246,81 @@ def main(
             )
 
 
+@app.command()
+def test_login(
+    url: str = typer.Option(None, "--url", help="Moodle/platform URL"),
+):
+    """Test Moodle/platform login credentials (opens browser)."""
+    load_dotenv()
+    username = os.environ.get("MOODLE_USERNAME")
+    password = os.environ.get("MOODLE_PASSWORD")
+
+    if not username or not password:
+        logger.error("MOODLE_USERNAME and MOODLE_PASSWORD must be set in .env")
+        raise typer.Exit(1)
+
+    if not url:
+        url = typer.prompt("Enter platform URL")
+
+    logger.info(f"Testing login to: {url}")
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        page = browser.new_page()
+
+        try:
+            page.goto(url)
+            page.fill('input[name="username"]', username)
+            page.fill('input[name="password"]', password)
+            page.click("button#loginbtn")
+            page.wait_for_load_state("domcontentloaded")
+
+            if "Dashboard" in page.title():
+                logger.info("✅ LOGIN SUCCESSFUL!")
+            else:
+                logger.warning("⚠️  Check browser - may need manual login")
+
+            time.sleep(10)
+        except Exception as e:
+            logger.error(f"Login test failed: {e}")
+        finally:
+            browser.close()
+
+
+@app.command()
+def check_models():
+    """Check available Gemini AI models for your API key."""
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+
+    if not api_key:
+        logger.error("GEMINI_API_KEY not found in .env")
+        raise typer.Exit(1)
+
+    try:
+        import google.generativeai as genai
+
+        genai.configure(api_key=api_key)
+        logger.info("Available Gemini models:")
+
+        for model in genai.list_models():
+            if "generateContent" in model.supported_generation_methods:
+                logger.info(f"  • {model.name}")
+    except Exception as e:
+        logger.error(f"Failed: {e}")
+
+
 if __name__ == "__main__":
-    typer.run(main)
+    # Make 'run' default if no command specified
+    import sys
+
+    if len(sys.argv) == 1 or (
+        len(sys.argv) > 1
+        and not sys.argv[1].startswith("-")
+        and sys.argv[1] not in ["run", "test-login", "check-models"]
+    ):
+        sys.argv.insert(1, "run")
+
+    app()

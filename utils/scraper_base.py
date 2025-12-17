@@ -2,6 +2,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
+from utils.logger import logger
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
@@ -18,7 +19,7 @@ class BaseScraper(ABC):
         self.quizzes_data: Dict[int, Dict[str, Any]] = {}
 
         # Playwright Setup (Shared)
-        print(f"--- [Playwright] Init Browser ({self.__class__.__name__}) ---")
+        logger.info(f"--- [Playwright] Init Browser ({self.__class__.__name__}) ---")
         self.playwright = sync_playwright().start()
         self.browser: Browser = self.playwright.chromium.launch(
             headless=False,  # Set False jika ingin debugging visual
@@ -108,7 +109,7 @@ class BaseScraper(ABC):
     def reset_quiz_data(self):
         """Membersihkan data soal dari memori (untuk persiapan Bagian selanjutnya)"""
         self.quizzes_data = {}
-        print("[Info] Memori soal dibersihkan untuk bagian baru.")
+        logger.info("[Info] Memori soal dibersihkan untuk bagian baru.")
 
     def close(self):
         import time
@@ -118,4 +119,4 @@ class BaseScraper(ABC):
             self.browser.close()
         if hasattr(self, "playwright"):
             self.playwright.stop()
-        print("[Playwright] Browser closed.")
+        logger.info("[Playwright] Browser closed.")

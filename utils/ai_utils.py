@@ -17,6 +17,7 @@
 import json
 import re
 from typing import Dict
+from utils.logger import logger
 
 import google.generativeai as genai
 from google.api_core import exceptions
@@ -49,29 +50,29 @@ def get_gemini_answers(quizzes: dict, api_key: str, model_name: str) -> Dict[str
     try:
         model = genai.GenerativeModel(model_name)
     except exceptions.NotFound:
-        print(f"Gemini API Error: Model '{model_name}' tidak ditemukan.")
+        logger.info(f"Gemini API Error: Model '{model_name}' tidak ditemukan.")
         return {}
 
-    print("--- Menghubungi Gemini API untuk semua jawaban (Mode Batch) ---")
+    logger.info("--- Menghubungi Gemini API untuk semua jawaban (Mode Batch) ---")
     batch_prompt = _format_batch_prompt(quizzes)
 
     try:
-        print(f"Mengirim {len(quizzes)} pertanyaan teks dalam satu permintaan...")
+        logger.info(f"Mengirim {len(quizzes)} pertanyaan teks dalam satu permintaan...")
         response = model.generate_content(batch_prompt)
 
         json_text = re.search(r"```json\s*([\s\S]+?)\s*```", response.text)
         cleaned_text = json_text.group(1) if json_text else response.text
 
         answers_from_ai = json.loads(cleaned_text)
-        print("Berhasil menerima dan mem-parsing semua jawaban dari Gemini.")
+        logger.info("Berhasil menerima dan mem-parsing semua jawaban dari Gemini.")
         return answers_from_ai
     except (json.JSONDecodeError, Exception) as e:
-        print(f"  > Terjadi error saat memproses respons dari AI: {e}")
+        logger.info(f"  > Terjadi error saat memproses respons dari AI: {e}")
         return {}
 
 
 def test_gemini_api(api_key: str, model_name: str) -> bool:
-    print("\n--- Testing Gemini API Connection ---")
+    logger.info("\n--- Testing Gemini API Connection ---")
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
@@ -79,17 +80,17 @@ def test_gemini_api(api_key: str, model_name: str) -> bool:
             "This is a test. Respond with the single word: OK"
         )
         if "OK" in response.text:
-            print("Gemini API Check: SUCCESS")
+            logger.info("Gemini API Check: SUCCESS")
             return True
         else:
-            print("Gemini API Check: WARNING - Respons tidak terduga")
+            logger.info("Gemini API Check: WARNING - Respons tidak terduga")
             return True
     except exceptions.PermissionDenied:
-        print("Gemini API Check: FAILED - API Key tidak valid")
+        logger.error("Gemini API Check: FAILED - API Key tidak valid")
         return False
     except exceptions.NotFound:
-        print(f"Gemini API Check: FAILED - Model '{model_name}' tidak ditemukan")
+        logger.error(f"Gemini API Check: FAILED - Model '{model_name}' tidak ditemukan")
         return False
     except Exception as e:
-        print(f"Gemini API Check: FAILED - Error: {e}")
+        logger.error(f"Gemini API Check: FAILED - Error: {e}")
         return False

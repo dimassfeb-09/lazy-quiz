@@ -5,6 +5,8 @@ import re
 import time
 from typing import Any, Dict, List
 
+from utils.logger import logger
+
 from .scraper_base import BaseScraper
 
 
@@ -26,7 +28,7 @@ class ExamScraper(BaseScraper):
             self.login()
             # Tidak ada "initialize attempt" khusus karena flow-nya linear setelah login
         except Exception as e:
-            print(f"[Exam Scraper Error] {e}")
+            logger.error(f"{e}")
             self.close()
             raise e
 
@@ -38,16 +40,16 @@ class ExamScraper(BaseScraper):
         3. User tekan Enter di terminal untuk lanjut.
         4. Bot menangani Pakta Integritas.
         """
-        print(f"Membuka halaman login: {self.base_url}")
+        logger.info(f"Membuka halaman login: {self.base_url}")
         self.page.goto(self.base_url)
 
         # --- FASE MANUAL USER ---
         print("\n" + "!" * 50)
-        print("PERHATIAN: Website ini menggunakan Captcha Gambar.")
-        print(
+        logger.info("PERHATIAN: Website ini menggunakan Captcha Gambar.")
+        logger.info(
             "Silakan isi NPM, Password, dan Captcha di Browser yang terbuka secara MANUAL."
         )
-        print("Klik 'Sign In' sampai berhasil masuk ke halaman Pakta Integritas.")
+        logger.info("Klik 'Sign In' sampai berhasil masuk ke halaman Pakta Integritas.")
         print("!" * 50)
 
         input(
@@ -55,26 +57,28 @@ class ExamScraper(BaseScraper):
         )
 
         # --- FASE OTOMATIS (Pakta Integritas) ---
-        print("Memeriksa Pakta Integritas...")
+        logger.info("Memeriksa Pakta Integritas...")
 
         # Cek apakah ada checkbox konfirmasi
         chk_konfirm = self.page.locator("#chkKonfirm")
         btn_konfirm = self.page.locator("#btnKonfirm")
 
         if chk_konfirm.is_visible():
-            print("  > Menyetujui Pakta Integritas...")
+            logger.info("  > Menyetujui Pakta Integritas...")
             chk_konfirm.check()
             time.sleep(0.5)
             btn_konfirm.click()
             self.page.wait_for_load_state("networkidle")
-            print("  > Pakta Integritas disetujui.")
+            logger.info("  > Pakta Integritas disetujui.")
         else:
-            print("  > Halaman Pakta Integritas tidak ditemukan (Mungkin sudah lewat).")
+            logger.info(
+                "  > Halaman Pakta Integritas tidak ditemukan (Mungkin sudah lewat)."
+            )
 
         # Cek Halaman "Mulai Ujian" atau Halaman Soal Langsung
         # Kadang ada halaman "Start" sebelum masuk ke soal nomor 1
         # Kita asumsikan user sudah diposisi siap mengerjakan atau bot sudah di halaman soal
-        print("Siap melakukan scraping soal.")
+        logger.info("Siap melakukan scraping soal.")
 
     def fetch_all_quizzes(self) -> Dict[int, Dict[str, Any]]:
         """
@@ -82,14 +86,14 @@ class ExamScraper(BaseScraper):
         Navigasi soal menggunakan tombol angka (lnkSoal1, lnkSoal2, dst).
         Kita harus klik satu per satu untuk mengambil teks soal.
         """
-        print("Mengambil daftar soal yang tersedia di Bagian ini...")
+        logger.info("Mengambil daftar soal yang tersedia di Bagian ini...")
 
         # Cari semua tombol navigasi soal yang aktif (Class: tombol-ers)
         # ID pattern: lnkSoal1, lnkSoal2, dst.
         nav_buttons = self.page.locator("div.tombol-ers a[id^='lnkSoal']")
         count = nav_buttons.count()
 
-        print(f"Ditemukan {count} soal pada Bagian (Block) ini.")
+        logger.info(f"Ditemukan {count} soal pada Bagian (Block) ini.")
 
         # Kita simpan ID tombol untuk di-iterate
         # (Playwright element handle bisa stale jika page reload, jadi kita simpan ID string-nya saja)
@@ -106,7 +110,7 @@ class ExamScraper(BaseScraper):
                 continue
             q_num_real = int(q_num_match.group(1))
 
-            print(f"  > Scraping Soal Nomor: {q_num_real}")
+            logger.info(f"  > Scraping Soal Nomor: {q_num_real}")
 
             # Klik tombol nomor soal dan tunggu PostBack
             self.page.click(f"#{btn_id}")
@@ -163,7 +167,7 @@ class ExamScraper(BaseScraper):
         return self.quizzes_data
 
     def save_answers(self, answers: Dict[str, str]) -> List[int]:
-        print("Memulai pengisian jawaban (Web Forms PostBack)...")
+        logger.info("Memulai pengisian jawaban (Web Forms PostBack)...")
 
         successfully_filled = []
 
@@ -181,7 +185,7 @@ class ExamScraper(BaseScraper):
             q_data = self.quizzes_data[q_num]
             btn_id = q_data.get("button_id")
 
-            print(f"  > Menuju Soal {q_num}...")
+            logger.info(f"  > Menuju Soal {q_num}...")
 
             # 1. Navigasi ke soal
             # Cek apakah kita sudah di soal yang benar (optimasi)
@@ -209,17 +213,17 @@ class ExamScraper(BaseScraper):
                         self.page.check(f"#{radio_id}")
                         clicked = True
                         successfully_filled.append(q_num)
-                        print(f"    Jawaban dipilih: {ans_text[:20]}...")
+                        logger.info(f"    Jawaban dipilih: {ans_text[:20]}...")
                         break
 
             if not clicked:
-                print(
+                logger.warning(
                     f"    [Gagal Match] Tidak menemukan opsi untuk: {ans_text[:20]}..."
                 )
                 continue
 
             # 3. SIMPAN JAWABAN
-            # Di Ujian Gundar, tombol "Simpan & Tampilkan Nomor X" (Next) berfungsi sebagai Save.
+            # Di Ujian, tombol "Simpan & Tampilkan Nomor X" (Next) berfungsi sebagai Save.
             # Atau tombol "Simpan Nomor X" (Prev).
             # Kita klik tombol Next (lnkNext) untuk save.
 
@@ -249,14 +253,14 @@ class ExamScraper(BaseScraper):
             is_last_part = False
 
         if is_last_part:
-            print("\n[!] TERDETEKSI INI ADALAH BAGIAN TERAKHIR.")
-            print("[!] SETELAH INI UJIAN AKAN BERAKHIR SEPENUHNYA.")
+            logger.info("\n[!] TERDETEKSI INI ADALAH BAGIAN TERAKHIR.")
+            logger.info("[!] SETELAH INI UJIAN AKAN BERAKHIR SEPENUHNYA.")
 
         # Sisa logikanya tetap sama karena ID elemennya identik
         finish_root_btn = self.page.locator("#lnkKeluarUjianRoot")
 
         if not finish_root_btn.is_visible():
-            print("Info: Tombol Keluar tidak ditemukan.")
+            logger.info("Info: Tombol Keluar tidak ditemukan.")
             return
 
         finish_root_btn.click()
@@ -276,13 +280,15 @@ class ExamScraper(BaseScraper):
             self.page.wait_for_load_state("networkidle")
 
             if is_last_part:
-                print("\n✅ UJIAN SELESAI SEPENUHNYA!")
+                logger.info("\n✅ UJIAN SELESAI SEPENUHNYA!")
             else:
-                print(f"✅ Bagian {current} Selesai. Loading Bagian selanjutnya...")
+                logger.info(
+                    f"✅ Bagian {current} Selesai. Loading Bagian selanjutnya..."
+                )
 
         except Exception as e:
-            print(f"Gagal submit final: {e}")
-            print("Coba submit manual di browser yang terbuka.")
+            logger.info(f"Gagal submit final: {e}")
+            logger.info("Coba submit manual di browser yang terbuka.")
 
     def get_current_block(self) -> int:
         """

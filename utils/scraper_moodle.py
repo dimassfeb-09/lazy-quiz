@@ -4,6 +4,7 @@
 import re
 import time
 from typing import Any, Dict, List
+from utils.logger import logger
 
 from .scraper_base import BaseScraper
 
@@ -26,18 +27,18 @@ class MoodleScraper(BaseScraper):
             if url and "login" not in url:
                 self._initialize_quiz_attempt(url)
         except Exception as e:
-            print(f"[Moodle Error] {e}")
+            logger.error(f"{e}")
             self.close()  # Bersihkan browser jika gagal init
             raise e
 
     def login(self):
-        print(f"Melakukan login ke Moodle sebagai: {self.username}...")
+        logger.info(f"Melakukan login ke Moodle sebagai: {self.username}...")
         try:
             self.page.goto(f"{self.base_url}/login/index.php")
 
             # Cek session reuse (jika cookies masih valid)
             if "Dashboard" in self.page.title() or "My courses" in self.page.title():
-                print("Session valid terdeteksi. Skip login.")
+                logger.info("Session valid terdeteksi. Skip login.")
                 return
 
             # Isi form login
@@ -53,17 +54,17 @@ class MoodleScraper(BaseScraper):
             if "login" in self.page.url and "Invalid login" in self.page.content():
                 raise ValueError("Login Gagal! Username/Password salah.")
 
-            print("Login Berhasil.")
+            logger.info("Login Berhasil.")
 
         except Exception as e:
             # Fallback jika timeout atau selector beda
             if "Dashboard" in self.page.title():
-                print("Login berhasil (Fallback check).")
+                logger.info("Login berhasil (Fallback check).")
                 return
             raise ConnectionError(f"Gagal Login: {e}")
 
     def _initialize_quiz_attempt(self, url: str):
-        print(f"Mengakses halaman kuis: {url}")
+        logger.info(f"Mengakses halaman kuis: {url}")
         self.page.goto(url)
         self.page.wait_for_load_state("domcontentloaded")
 
@@ -78,12 +79,12 @@ class MoodleScraper(BaseScraper):
         )
 
         if continue_btn.count() > 0 and continue_btn.first.is_visible():
-            print("Melanjutkan attempt yang sudah ada...")
+            logger.info("Melanjutkan attempt yang sudah ada...")
             continue_btn.first.click()
             self.page.wait_for_load_state("domcontentloaded")
 
         elif attempt_btn.count() > 0 and attempt_btn.first.is_visible():
-            print("Memulai attempt baru...")
+            logger.info("Memulai attempt baru...")
             attempt_btn.first.click()
 
             # 3. Handle Modal Konfirmasi (Time Limit / Password)
@@ -97,7 +98,7 @@ class MoodleScraper(BaseScraper):
                 if start_confirm.count() > 0:
                     # Jika tombol konfirmasi ada, klik
                     if start_confirm.first.is_visible():
-                        print("  > Konfirmasi 'Start attempt'...")
+                        logger.info("  > Konfirmasi 'Start attempt'...")
                         start_confirm.first.click()
                         self.page.wait_for_load_state("domcontentloaded")
             except Exception:
@@ -106,7 +107,7 @@ class MoodleScraper(BaseScraper):
         # Validasi akhir
         if "attempt.php" in self.page.url:
             self.attempt_url = self.page.url
-            print(f"Masuk di halaman attempt: {self.attempt_url}")
+            logger.info(f"Masuk di halaman attempt: {self.attempt_url}")
         else:
             raise Exception(
                 "Gagal masuk ke halaman attempt kuis. Cek URL atau status kuis."
@@ -116,7 +117,7 @@ class MoodleScraper(BaseScraper):
         if not self.attempt_url:
             raise Exception("Attempt URL belum siap.")
 
-        print("Mengambil struktur navigasi soal (Scraping)...")
+        logger.info("Mengambil struktur navigasi soal (Scraping)...")
         # Pastikan di halaman attempt
         if self.page.url != self.attempt_url:
             self.page.goto(self.attempt_url)
@@ -140,12 +141,12 @@ class MoodleScraper(BaseScraper):
                     pages_to_visit.append(href)
 
         pages_to_visit = sorted(list(seen_urls))
-        print(f"Total halaman kuis: {len(pages_to_visit)}")
+        logger.info(f"Total halaman kuis: {len(pages_to_visit)}")
 
         global_q_counter = 1
 
         for page_url in pages_to_visit:
-            print(f"  > Scraping Halaman: {page_url}")
+            logger.info(f"  > Scraping Halaman: {page_url}")
             if self.page.url != page_url:
                 self.page.goto(page_url)
                 self.page.wait_for_load_state("domcontentloaded")
@@ -197,7 +198,7 @@ class MoodleScraper(BaseScraper):
         return self.quizzes_data
 
     def save_answers(self, answers: Dict[str, str]) -> List[int]:
-        print("Memulai pengisian jawaban (UI Interaction)...")
+        logger.info("Memulai pengisian jawaban (UI Interaction)...")
 
         def clean_str(text):
             text = text.replace("\xa0", " ")
@@ -217,7 +218,7 @@ class MoodleScraper(BaseScraper):
         successfully_filled = []
 
         for page_url, q_map in page_buckets.items():
-            print(f"  > Mengakses halaman: {page_url}")
+            logger.info(f"  > Mengakses halaman: {page_url}")
             if self.page.url != page_url:
                 self.page.goto(page_url)
                 self.page.wait_for_load_state("domcontentloaded")
@@ -265,11 +266,11 @@ class MoodleScraper(BaseScraper):
                                 break
 
                     if not clicked:
-                        print(f"    [Gagal Match Opsi] Soal {q_num}")
+                        logger.info(f"    [Gagal Match Opsi] Soal {q_num}")
                 else:
-                    print(f"    [Gagal HTML] Soal {q_num} tidak ditemukan di DOM.")
+                    logger.info(f"    [Gagal HTML] Soal {q_num} tidak ditemukan di DOM.")
 
-            print(f"    Berhasil mengisi {page_success_count} soal.")
+            logger.info(f"    Berhasil mengisi {page_success_count} soal.")
 
             # Klik Next Page untuk save (Moodle save on navigate)
             # Kecuali ini halaman terakhir
@@ -281,7 +282,7 @@ class MoodleScraper(BaseScraper):
         return successfully_filled
 
     def submit_final(self):
-        print("Memulai proses Final Submit...")
+        logger.info("Memulai proses Final Submit...")
         if not self.attempt_url:
             return
 
@@ -311,8 +312,8 @@ class MoodleScraper(BaseScraper):
             if confirm_btn.count() > 0 and confirm_btn.first.is_visible():
                 confirm_btn.first.click()
                 self.page.wait_for_load_state("networkidle")
-                print("SUKSES: Kuis telah disubmit (Finished).")
+                logger.info("SUKSES: Kuis telah disubmit (Finished).")
             else:
-                print("SUKSES: Submit (Tanpa Modal).")
+                logger.info("SUKSES: Submit (Tanpa Modal).")
         else:
-            print("Info: Tombol submit tidak ditemukan (Mungkin sudah selesai).")
+            logger.info("Info: Tombol submit tidak ditemukan (Mungkin sudah selesai).")
