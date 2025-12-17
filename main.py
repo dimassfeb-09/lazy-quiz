@@ -21,6 +21,59 @@ app = typer.Typer(
 CACHE_DIR = "cache"
 
 
+def get_available_models(api_key: str) -> list:
+    """Get list of available Gemini models that support text generation."""
+    try:
+        import google.generativeai as genai
+
+        genai.configure(api_key=api_key)
+
+        models = []
+        for model in genai.list_models():
+            if "generateContent" in model.supported_generation_methods:
+                models.append(model.name)
+        return models
+    except Exception as e:
+        logger.error(f"Failed to fetch models: {e}")
+        return []
+
+
+def prompt_model_selection(api_key: str) -> str:
+    """Prompt user to select a Gemini model if not configured."""
+    logger.info("GEMINI_MODEL not configured in .env")
+    logger.info("Fetching available models...")
+
+    models = get_available_models(api_key)
+
+    if not models:
+        logger.warning("No models found, using default: gemini-flash-latest")
+        return "gemini-flash-latest"
+
+    logger.info("\nAvailable Gemini models:")
+    for i, model in enumerate(models, 1):
+        logger.info(f"  {i}. {model}")
+
+    # Prompt for selection
+    while True:
+        choice = typer.prompt("\nSelect model number (or press Enter for default)")
+
+        if choice == "":
+            default = "gemini-flash-latest"
+            logger.info(f"Using default: {default}")
+            return default
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(models):
+                selected = models[idx]
+                logger.info(f"Selected: {selected}")
+                return selected
+            else:
+                logger.warning(f"Invalid choice. Enter 1-{len(models)}")
+        except ValueError:
+            logger.warning("Invalid input. Enter a number or press Enter")
+
+
 def get_scraper_class(url: str):
     """Detect scraper type based on platform indicators in URL"""
     # Check for ASP.NET indicators (.aspx extension, common ASP.NET patterns)
@@ -210,7 +263,15 @@ def run_command(
     moodle_username = os.environ.get("MOODLE_USERNAME")
     moodle_password = os.environ.get("MOODLE_PASSWORD")
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    gemini_model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+    gemini_model = os.environ.get("GEMINI_MODEL", "").strip()
+
+    # If model not configured, prompt for selection
+    if not gemini_model and gemini_api_key:
+        gemini_model = prompt_model_selection(gemini_api_key)
+    elif not gemini_model:
+        # No API key, use default
+        gemini_model = "gemini-flash-latest"
+        logger.warning(f"Using default model: {gemini_model}")
 
     # Create args object for compatibility
     class Args:
@@ -251,65 +312,22 @@ def test_login(
     url: str = typer.Option(None, "--url", help="Moodle/platform URL"),
 ):
     """Test Moodle/platform login credentials (opens browser)."""
-    load_dotenv()
-    username = os.environ.get("MOODLE_USERNAME")
-    password = os.environ.get("MOODLE_PASSWORD")
+    # Import and call the test_login script
+    import sys
 
-    if not username or not password:
-        logger.error("MOODLE_USERNAME and MOODLE_PASSWORD must be set in .env")
-        raise typer.Exit(1)
+    sys.path.insert(0, "scripts")
+    from test_login import test_login as run_test_login
 
-    if not url:
-        url = typer.prompt("Enter platform URL")
-
-    logger.info(f"Testing login to: {url}")
-
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
-
-        try:
-            page.goto(url)
-            page.fill('input[name="username"]', username)
-            page.fill('input[name="password"]', password)
-            page.click("button#loginbtn")
-            page.wait_for_load_state("domcontentloaded")
-
-            if "Dashboard" in page.title():
-                logger.info("✅ LOGIN SUCCESSFUL!")
-            else:
-                logger.warning("⚠️  Check browser - may need manual login")
-
-            time.sleep(10)
-        except Exception as e:
-            logger.error(f"Login test failed: {e}")
-        finally:
-            browser.close()
+    run_test_login(url)
 
 
 @app.command()
 def check_models():
     """Check available Gemini AI models for your API key."""
-    load_dotenv()
-    api_key = os.environ.get("GEMINI_API_KEY")
+    # Import and run the check_models script
+    import sys
 
-    if not api_key:
-        logger.error("GEMINI_API_KEY not found in .env")
-        raise typer.Exit(1)
-
-    try:
-        import google.generativeai as genai
-
-        genai.configure(api_key=api_key)
-        logger.info("Available Gemini models:")
-
-        for model in genai.list_models():
-            if "generateContent" in model.supported_generation_methods:
-                logger.info(f"  • {model.name}")
-    except Exception as e:
-        logger.error(f"Failed: {e}")
+    sys.path.insert(0, "scripts")
 
 
 if __name__ == "__main__":

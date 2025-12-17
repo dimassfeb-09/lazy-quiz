@@ -14,17 +14,24 @@ load_dotenv()
 
 MOODLE_USERNAME = os.environ.get("MOODLE_USERNAME")
 MOODLE_PASSWORD = os.environ.get("MOODLE_PASSWORD")
-LOGIN_URL = "https://your-moodle-site.edu/login/index.php"  # Generic URL
 
 
-def test_login():
+def test_login(url=None):
     """
     Test login functionality using Playwright.
-    Updates the script to use Playwright instead of Selenium.
+
+    Args:
+        url: Login URL (optional, will prompt if not provided)
     """
     if not all([MOODLE_USERNAME, MOODLE_PASSWORD]):
         logger.error("Error: MOODLE_USERNAME and MOODLE_PASSWORD must be set in .env")
         return
+
+    if not url:
+        url = input("Enter login URL: ").strip()
+        if not url:
+            url = "https://your-moodle-site.edu/login/index.php"
+            logger.info(f"Using default URL: {url}")
 
     logger.info("Starting Playwright browser for login test...")
 
@@ -36,8 +43,8 @@ def test_login():
         page = context.new_page()
 
         try:
-            logger.info(f"Opening login page: {LOGIN_URL}")
-            page.goto(LOGIN_URL)
+            logger.info(f"Opening login page: {url}")
+            page.goto(url)
 
             logger.info("Filling in login credentials...")
             page.fill('input[name="username"]', MOODLE_USERNAME)
