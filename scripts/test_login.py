@@ -28,10 +28,14 @@ def test_login(url=None):
         return
 
     if not url:
-        url = input("Enter login URL: ").strip()
+        # Try to get from .env first
+        url = os.environ.get("MOODLE_URL", "").strip()
+
         if not url:
-            url = "https://your-moodle-site.edu/login/index.php"
-            logger.info(f"Using default URL: {url}")
+            url = input("Enter login URL: ").strip()
+            if not url:
+                url = "https://your-moodle-site.edu/login/index.php"
+                logger.info(f"Using default URL: {url}")
 
     logger.info("Starting Playwright browser for login test...")
 
