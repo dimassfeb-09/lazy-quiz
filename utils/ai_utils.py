@@ -17,12 +17,69 @@
 import json
 import re
 import time
+from collections import deque
 from typing import Dict
 
 import google.generativeai as genai
 from google.api_core import exceptions
 
 from utils.logger import logger
+
+
+class RateLimiter:
+    """
+    Smart rate limiter for Gemini API.
+    Tracks requests and only delays when needed.
+    Uses exponential backoff on 429 errors.
+    """
+
+    def __init__(self, requests_per_minute: int = 15):
+        self.rpm = requests_per_minute
+        self.request_times = deque()  # Track request timestamps
+        self.window = 60  # 60 seconds window
+
+    def wait_if_needed(self):
+        """Wait only if we're approaching the rate limit."""
+        now = time.time()
+
+        # Remove old requests outside the window
+        while self.request_times and self.request_times[0] < now - self.window:
+            self.request_times.popleft()
+
+        # If we're at the limit, wait until oldest request expires
+        if len(self.request_times) >= self.rpm:
+            oldest = self.request_times[0]
+            wait_time = (oldest + self.window) - now + 0.5  # +0.5s buffer
+            if wait_time > 0:
+                logger.info(f"    Rate limit: waiting {wait_time:.1f}s...")
+                time.sleep(wait_time)
+
+    def record_request(self):
+        """Record a successful request."""
+        self.request_times.append(time.time())
+
+    @staticmethod
+    def backoff_retry(func, max_retries: int = 3):
+        """
+        Execute function with exponential backoff on 429 errors.
+        Returns (success, result).
+        """
+        for attempt in range(max_retries):
+            try:
+                result = func()
+                return True, result
+            except exceptions.ResourceExhausted:
+                # 429 Too Many Requests
+                wait_time = (2**attempt) * 5  # 5s, 10s, 20s
+                logger.warning(f"    Rate limited (429). Retry in {wait_time}s...")
+                time.sleep(wait_time)
+            except Exception as e:
+                raise e
+        return False, None
+
+
+# Global rate limiter instance
+_rate_limiter = RateLimiter()
 
 
 def _format_batch_prompt(quizzes: dict) -> str:
@@ -130,11 +187,23 @@ def get_gemini_answer_for_image(
     prompt += "\nRespond with the correct answer option (letter + text if visible)."
 
     try:
-        logger.info(f"  > [Image Q{question_number}] Sending to Gemini Vision...")
-        response = model.generate_content([prompt, image])
+        # Smart rate limiting: only wait if approaching limit
+        _rate_limiter.wait_if_needed()
 
-        # Rate limiting: 15 RPM = 4 seconds between requests
-        time.sleep(4)
+        logger.info(f"  > [Image Q{question_number}] Sending to Gemini Vision...")
+
+        # Use backoff retry for 429 errors
+        def make_request():
+            return model.generate_content([prompt, image])
+
+        success, response = _rate_limiter.backoff_retry(make_request)
+
+        if not success:
+            logger.error(f"  > [Image Q{question_number}] Failed after retries")
+            return ""
+
+        # Record successful request
+        _rate_limiter.record_request()
 
         answer = response.text.strip()
 
