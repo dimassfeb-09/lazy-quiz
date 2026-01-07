@@ -310,6 +310,9 @@ def run_command(
 @app.command()
 def test_login(
     url: str = typer.Option(None, "--url", help="Moodle/platform URL"),
+    no_session: bool = typer.Option(
+        False, "--no-session", help="Skip saved session, force fresh login"
+    ),
 ):
     """Test Moodle/platform login credentials (opens browser)."""
     # Import and call the test_login script
@@ -318,7 +321,7 @@ def test_login(
     sys.path.insert(0, "scripts")
     from test_login import test_login as run_test_login
 
-    run_test_login(url)
+    run_test_login(url, no_session=no_session)
 
 
 @app.command()

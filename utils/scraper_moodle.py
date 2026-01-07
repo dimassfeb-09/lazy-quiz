@@ -4,6 +4,7 @@
 import re
 import time
 from typing import Any, Dict, List
+
 from utils.logger import logger
 
 from .scraper_base import BaseScraper
@@ -55,11 +56,15 @@ class MoodleScraper(BaseScraper):
                 raise ValueError("Login Gagal! Username/Password salah.")
 
             logger.info("Login Berhasil.")
+            # Save session for next time
+            self.session_manager.save_session(self.context, self.username)
 
         except Exception as e:
             # Fallback jika timeout atau selector beda
             if "Dashboard" in self.page.title():
                 logger.info("Login berhasil (Fallback check).")
+                # Save session for next time
+                self.session_manager.save_session(self.context, self.username)
                 return
             raise ConnectionError(f"Gagal Login: {e}")
 
@@ -268,7 +273,9 @@ class MoodleScraper(BaseScraper):
                     if not clicked:
                         logger.info(f"    [Gagal Match Opsi] Soal {q_num}")
                 else:
-                    logger.info(f"    [Gagal HTML] Soal {q_num} tidak ditemukan di DOM.")
+                    logger.info(
+                        f"    [Gagal HTML] Soal {q_num} tidak ditemukan di DOM."
+                    )
 
             logger.info(f"    Berhasil mengisi {page_success_count} soal.")
 

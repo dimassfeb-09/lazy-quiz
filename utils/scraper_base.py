@@ -1,10 +1,17 @@
+"""
+Base class for all scrapers with common Playwright setup.
+Provides anti-detection features and session management.
+"""
+
 import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
-from utils.logger import logger
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
+
+from utils.logger import logger
+from utils.session_manager import SessionManager
 
 
 class BaseScraper(ABC):
@@ -17,6 +24,9 @@ class BaseScraper(ABC):
         self.quiz_id: Optional[str] = self._extract_id_from_url(url)
         self.attempt_url: Optional[str] = None
         self.quizzes_data: Dict[int, Dict[str, Any]] = {}
+
+        # Initialize session manager
+        self.session_manager = SessionManager()
 
         # Playwright Setup (Shared)
         logger.info(f"--- [Playwright] Init Browser ({self.__class__.__name__}) ---")
