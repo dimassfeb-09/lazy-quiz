@@ -1,20 +1,16 @@
-# Lazy Quiz v3.0 - Bot Otomatis Kuis Moodle (Playwright Version)
+# Lazy Quiz v3.1 - Bot Otomatis Kuis (Playwright + Gemini AI)
 
 ## Pendahuluan
 
-**Lazy Quiz** adalah skrip Python cerdas yang dirancang untuk mengotomatiskan pengerjaan kuis di platform e-learning Moodle.
+**Lazy Quiz** adalah skrip Python cerdas yang dirancang untuk mengotomatiskan pengerjaan kuis di platform e-learning menggunakan browser automation dan AI.
 
-🚀 **Pembaruan Versi 2.0:**
-Proyek ini telah mengalami **refactoring total**. Versi lama menggunakan Selenium, versi ini beralih ke **Playwright** - library browser automation modern yang lebih cepat, stabil, dan powerful.
+🚀 **Fitur Versi 3.1:**
 
-**Apa bedanya dengan versi lama?**
-
-- **Lebih Modern & Stabil:** Playwright lebih ringan dari Selenium, dengan API yang lebih baik dan error handling yang superior.
-- **Headless Ready:** Bisa berjalan di mode headless untuk server/VPS atau dengan browser visible untuk debugging.
-- **Anti-Detection:** Dilengkapi dengan teknik anti-bot detection (menghapus webdriver flags, mocking navigator properties).
-- **Multi-Browser Support:** Mendukung Chromium, Firefox, dan WebKit (meskipun default menggunakan Chromium).
-
-Proyek ini tetap terintegrasi dengan **Google Gemini AI** untuk menganalisis dan menjawab pertanyaan secara otomatis.
+- **Playwright Browser Automation** - Modern, cepat, dan stabil
+- **Integrasi Gemini AI** - Mendukung soal teks DAN gambar
+- **Auto Captcha Solving** - Gemini Vision memecahkan captcha otomatis
+- **Session Persistence** - Skip login di run berikutnya
+- **Smart Rate Limiting** - Penggunaan API yang efisien
 
 ---
 
@@ -22,115 +18,128 @@ Proyek ini tetap terintegrasi dengan **Google Gemini AI** untuk menganalisis dan
 
 **PROYEK INI DIBUAT HANYA UNTUK TUJUAN PENDIDIKAN DAN EKSPERIMENTAL.**
 
-- **Jangan Pernah** menggunakan skrip ini untuk mengerjakan ujian, kuis, atau tugas akademik yang sesungguhnya. Melakukan hal tersebut adalah bentuk kecurangan dan pelanggaran serius terhadap **integritas akademik**.
-- Konsekuensi dari kecurangan akademik bisa sangat berat, termasuk kegagalan mata kuliah, skorsing, atau bahkan dikeluarkan dari institusi pendidikan Anda.
-- **Pengguna bertanggung jawab penuh** atas segala tindakan yang dilakukan menggunakan kode ini. Pengembang tidak bertanggung jawab atas penyalahgunaan apa pun.
+- **Jangan Pernah** menggunakan skrip ini untuk mengerjakan ujian atau kuis yang sesungguhnya. Ini adalah kecurangan akademik.
+- Pengguna **bertanggung jawab penuh** atas segala tindakan menggunakan kode ini.
+- Pengembang tidak bertanggung jawab atas penyalahgunaan apa pun.
 
 ---
 
-## ✨ Fitur Baru (v3.0)
+## ✨ Fitur
 
-- **Playwright Browser Automation:** Login dan navigasi halaman dilakukan menggunakan Playwright dengan anti-detection features.
-- **Auto-Fill & Save (Safe Mode):**
-  - Bot akan **mengisi dan menyimpan** jawaban ke server Moodle secara otomatis.
-  - **Human-in-the-loop:** Secara default, bot **TIDAK** akan melakukan _Final Submit_. Bot akan berhenti dan meminta konfirmasi Anda, memberi Anda kesempatan untuk memeriksa jawaban di browser sebelum disubmit.
-- **Auto-Submit:** Opsi argumen `--auto-submit` untuk Anda yang ingin bot langsung melakukan _Submit all and finish_ tanpa konfirmasi.
-- **Smart Scraping:** Mendeteksi navigasi halaman (pagination) dan melewati soal bergambar secara otomatis.
-- **Integrasi AI:** Menggunakan Google Gemini untuk menjawab soal pilihan ganda berbasis teks.
-- **Cache System:** Menyimpan soal yang sudah diambil agar tidak perlu _request_ ulang jika terjadi gangguan koneksi.
+### Fitur Utama
+
+- **Multi-Platform:** Moodle LMS dan platform ujian ASP.NET
+- **AI-Powered:** Google Gemini untuk soal berbasis teks
+- **Soal Bergambar:** Gemini Vision menganalisis screenshot soal bergambar
+- **Anti-Detection:** Menghapus flag webdriver, mocking navigator properties
+- **Sistem Cache:** Menyimpan soal secara lokal agar tidak perlu fetch ulang
+
+### Baru di v3.1
+
+- **Session Persistence:** Menyimpan cookies/state browser setelah login, skip login berikutnya
+- **Auto Captcha Solving:** Gemini Vision membaca dan memecahkan captcha (platform ujian)
+- **Smart Rate Limiting:** Hanya delay saat mendekati limit API, exponential backoff pada 429
+- **Flag `--no-session`:** Paksa login baru saat diperlukan
+- **Pemilihan Model Interaktif:** Pilih model Gemini jika belum dikonfigurasi
+
+### Safe Mode (Default)
+
+- Bot mengisi jawaban tapi **TIDAK auto-submit**
+- Meminta konfirmasi sebelum submit akhir
+- Gunakan `--auto-submit` untuk bypass konfirmasi
 
 ---
 
-## 🌐 Platform Compatibility
+## 🌐 Kompatibilitas Platform
 
-This tool works with multiple learning management systems:
-
-- **Moodle LMS**: Any Moodle-based platform (detects automatically from URL)
-- **ASP.NET Exam Platforms**: Web Forms-based quiz systems (detects `.aspx` in URL)
-- **Auto-Detection**: Scraper type is selected automatically based on your quiz URL
+| Platform     | Deteksi            | Login              | Soal Gambar      |
+| ------------ | ------------------ | ------------------ | ---------------- |
+| Moodle LMS   | Otomatis (default) | Auto + Session     | ✅ Gemini Vision |
+| ASP.NET Exam | `.aspx` di URL     | Auto Captcha Solve | ✅ Gemini Vision |
 
 ---
 
 ## ⚙️ Kebutuhan Sistem
 
-- **Python 3.8** atau yang lebih baru.
-- **uv** - Package manager modern untuk Python (lebih cepat dari pip).
-- Koneksi Internet.
-- Akun Google Gemini API (Gratis).
-- **Playwright** akan menginstal browser Chromium secara otomatis saat setup.
+- **Python 3.8+**
+- **uv** - Package manager modern untuk Python
+- Koneksi internet
+- Google Gemini API Key (Gratis!)
+- Playwright (auto-install Chromium)
 
 ---
 
 ## 🚀 Cara Penggunaan
 
-1.  **Clone Repositori**
+### 1. Clone & Install
 
-    ```bash
-    git clone https://github.com/jtnqr/lazy-quiz.git
-    cd lazy-quiz
-    ```
+```bash
+git clone https://github.com/jtnqr/lazy-quiz.git
+cd lazy-quiz
 
-2.  **Instal Dependensi & Sync Project**
+# Install dependencies
+pip install uv
+uv sync
 
-    Proyek ini menggunakan **uv** untuk manajemen dependency yang lebih cepat:
+# Install browser
+uv run playwright install chromium
+```
 
-    ```bash
-    # Instal uv jika belum ada (opsional, hanya jika belum terinstal)
-    pip install uv
+### 2. Konfigurasi `.env`
 
-    # Sync dependencies dari pyproject.toml
-    uv sync
-    ```
+```bash
+# Salin example dan edit
+cp .env.example .env
+```
 
-3.  **Instal Browser Playwright**
+```ini
+# Kredensial
+MOODLE_USERNAME=username_anda
+MOODLE_PASSWORD=password_anda
 
-    Setelah menginstal dependencies, Playwright perlu mengunduh browser Chromium:
+# URL Platform (opsional - untuk kemudahan)
+MOODLE_URL=https://moodle-anda.edu
+EXAM_URL=https://exam-anda.edu
 
-    ```bash
-    # Gunakan uv run untuk menjalankan command di environment virtual
-    uv run playwright install chromium
-    ```
+# Gemini AI
+GEMINI_API_KEY=AIzaSy.....
+GEMINI_MODEL=gemini-flash-latest
+```
 
-4.  **Siapkan File Konfigurasi (`.env`)**
-    Salin file `.env.example` menjadi `.env` dan isi dengan kredensial Anda.
+### 3. Jalankan
 
-    ```bash
-    # Ganti kredensial berikut dengan akun Moodle/V-Class Anda
-    MOODLE_USERNAME="USERNAME_ANDA"
-    MOODLE_PASSWORD="PASSWORD_ANDA"
+```bash
+# Mode interaktif (rekomendasi)
+uv run python main.py
 
-    # API Key Google Gemini (Wajib untuk fitur AI)
-    GEMINI_API_KEY="AIzaSy....."
-    GEMINI_MODEL="gemini-pro"
-    ```
+# Dengan URL
+uv run python main.py run --url "https://moodle.edu/mod/quiz/attempt.php?..."
 
-5.  **Jalankan Skrip**
+# Auto-submit (tanpa konfirmasi)
+uv run python main.py run --url "..." --auto-submit
+```
 
-    - **Mode Interaktif (Rekomendasi):**
-      Jalankan tanpa argumen. Skrip akan meminta URL kuis, mengisi jawaban, lalu meminta konfirmasi sebelum submit.
+---
 
-      ```bash
-      uv run python main.py
-      ```
+## 📋 Perintah CLI
 
-    - **Mode Non-Interaktif (Langsung URL):**
+| Perintah                  | Deskripsi                                    |
+| ------------------------- | -------------------------------------------- |
+| `run`                     | Otomasi kuis utama (default)                 |
+| `test-login`              | Tes kredensial login                         |
+| `test-login --no-session` | Paksa login baru (abaikan session tersimpan) |
+| `check-models`            | Lihat daftar model Gemini yang tersedia      |
 
-      ```bash
-      uv run python main.py --url "https://your-moodle-site.edu/mod/quiz/attempt.php?attempt=xxxxx"
-      ```
+### Opsi Run
 
-    - **Mode Auto-Submit (Langsung Kumpul):**
-      Gunakan flag ini jika Anda ingin bot langsung melakukan _Submit all and finish_ tanpa konfirmasi.
-
-      ```bash
-      uv run python main.py --url "..." --auto-submit
-      ```
-
-    - **Opsi Tambahan:**
-      - `--scrape-only`: Hanya mengambil soal dan simpan ke JSON (tidak menjawab/mengisi ke Moodle).
-      - `--answer-file "file.json"`: Mengisi kuis menggunakan jawaban dari file JSON lokal (tanpa AI).
-      - `--no-cache`: Paksa ambil ulang soal dari server.
-      - `--dry-run`: Tes login dan koneksi API tanpa mengakses kuis.
+| Flag                 | Deskripsi                        |
+| -------------------- | -------------------------------- |
+| `--url TEXT`         | URL kuis yang akan diproses      |
+| `--auto-submit`      | Submit tanpa konfirmasi          |
+| `--scrape-only`      | Hanya ambil soal, tidak menjawab |
+| `--no-cache`         | Paksa ambil ulang soal           |
+| `--dry-run`          | Tes koneksi saja                 |
+| `--answer-file FILE` | Muat jawaban dari file JSON      |
 
 ---
 
@@ -138,20 +147,43 @@ This tool works with multiple learning management systems:
 
 ```
 lazy-quiz/
-├── .env                     # Konfigurasi kredensial
-├── main.py                  # Entry point (CLI & Logic Controller)
-├── pyproject.toml           # Daftar dependencies (playwright, google-generativeai, python-dotenv)
+├── main.py                  # Entry point CLI (Typer)
+├── pyproject.toml           # Dependencies
+├── .env                     # Kredensial (gitignored)
 ├── utils/
-│   ├── scraper_base.py      # Base class untuk semua scrapers (Abstract)
-│   ├── scraper_moodle.py    # Moodle LMS scraper implementation
-│   ├── scraper_exam.py      # ASP.NET Web Forms exam scraper
-│   └── ai_utils.py          # Integrasi Gemini API
-├── cache/                   # Penyimpanan sementara soal (JSON)
-└── output/                  # Hasil jawaban (Shareable JSON)
+│   ├── scraper_base.py      # Base class scraper
+│   ├── scraper_moodle.py    # Implementasi Moodle
+│   ├── scraper_exam.py      # Implementasi ASP.NET exam
+│   ├── ai_utils.py          # Gemini AI + Vision + Rate Limiter
+│   ├── session_manager.py   # Session persistence browser
+│   └── logger.py            # Logging terpusat
+├── scripts/
+│   ├── test_login.py        # Utilitas tes login
+│   └── check_models.py      # Cek model Gemini
+└── cache/                   # Cache soal (gitignored)
 ```
+
+---
+
+## 🔧 Cara Kerja
+
+```
+1. Muat session tersimpan (jika ada)
+2. Login (otomatis atau manual)
+   - Moodle: Auto-fill kredensial
+   - Exam: Auto-solve captcha dengan Gemini Vision
+3. Scrape soal-soal
+   - Soal teks → batch ke Gemini
+   - Soal gambar → screenshot → Gemini Vision
+4. Isi jawaban di browser
+5. Tunggu konfirmasi (atau auto-submit)
+6. Simpan session untuk run berikutnya
+```
+
+---
 
 ## 📜 Lisensi
 
-Proyek ini dilindungi dan didistribusikan di bawah Lisensi **GNU General Public License v3.0 (GPLv3)**.
+Proyek ini dilisensikan di bawah **GNU General Public License v3.0 (GPLv3)**.
 
-Lihat file `LICENSE` untuk informasi lebih lanjut.
+Lihat file [LICENSE](LICENSE) untuk detail lebih lanjut.
