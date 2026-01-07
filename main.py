@@ -173,6 +173,34 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                     with open(answer_cache_file, "w") as f:
                         json.dump(answers_from_ai, f, indent=2)
 
+            # --- FASE 2b: IMAGE QUESTIONS (Gemini Vision) ---
+            image_questions = {
+                k: v
+                for k, v in qz_quizzes.items()
+                if v.get("has_image") and v.get("image_data")
+            }
+
+            if image_questions and gemini_api_key:
+                logger.info(
+                    f"\\n>>> Processing {len(image_questions)} IMAGE questions with Gemini Vision <<<"
+                )
+                for q_num, q_data in image_questions.items():
+                    # Skip if already have answer
+                    if str(q_num) in answers_from_ai:
+                        continue
+
+                    answer = ai.get_gemini_answer_for_image(
+                        question_number=str(q_num),
+                        question_text=q_data.get("question_text", ""),
+                        answers=q_data.get("answers", []),
+                        image_data=q_data["image_data"],
+                        api_key=gemini_api_key,
+                        model_name=gemini_model,
+                    )
+
+                    if answer:
+                        answers_from_ai[str(q_num)] = answer
+
             # Gabungkan jawaban
             answers_to_fill = answers_from_ai
 

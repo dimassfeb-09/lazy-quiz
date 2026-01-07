@@ -192,10 +192,25 @@ class MoodleScraper(BaseScraper):
 
                         answers.append(ans_text)
 
+                # Capture image if question has images
+                image_data = None
+                if has_image:
+                    try:
+                        # Screenshot the question container
+                        image_data = q_div.screenshot()
+                        logger.info(
+                            f"    [Q{global_q_counter}] Captured image ({len(image_data)} bytes)"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"    [Q{global_q_counter}] Failed to capture image: {e}"
+                        )
+
                 self.quizzes_data[global_q_counter] = {
                     "question_text": q_text.strip(),
                     "answers": answers,
                     "has_image": has_image,
+                    "image_data": image_data,
                     "page_url": page_url,
                 }
                 global_q_counter += 1

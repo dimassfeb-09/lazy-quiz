@@ -16,11 +16,13 @@
 
 import json
 import re
+import time
 from typing import Dict
-from utils.logger import logger
 
 import google.generativeai as genai
 from google.api_core import exceptions
+
+from utils.logger import logger
 
 
 def _format_batch_prompt(quizzes: dict) -> str:
@@ -69,6 +71,86 @@ def get_gemini_answers(quizzes: dict, api_key: str, model_name: str) -> Dict[str
     except (json.JSONDecodeError, Exception) as e:
         logger.info(f"  > Terjadi error saat memproses respons dari AI: {e}")
         return {}
+
+
+def get_gemini_answer_for_image(
+    question_number: str,
+    question_text: str,
+    answers: list,
+    image_data: bytes,
+    api_key: str,
+    model_name: str,
+) -> str:
+    """
+    Get answer for an image-based question using Gemini Vision.
+
+    Args:
+        question_number: Question number for logging
+        question_text: Any text associated with the question
+        answers: List of answer options
+        image_data: Screenshot of question as bytes (PNG)
+        api_key: Gemini API key
+        model_name: Gemini model name
+
+    Returns:
+        The selected answer text, or empty string if failed
+    """
+    import io
+
+    import PIL.Image
+
+    genai.configure(api_key=api_key)
+
+    try:
+        model = genai.GenerativeModel(model_name)
+    except exceptions.NotFound:
+        logger.error(f"Gemini API Error: Model '{model_name}' not found")
+        return ""
+
+    # Convert bytes to PIL Image
+    image = PIL.Image.open(io.BytesIO(image_data))
+
+    # Build prompt
+    prompt = (
+        "You are an expert at answering multiple choice questions. "
+        "Look at this image carefully - it shows a question and/or answer options. "
+        "The answer options may be shown as text OR as images in the screenshot. "
+        "Identify the correct answer and return ONLY the letter/label of the correct option (e.g., 'a' or 'b' or 'c'). "
+        "If you can see the full answer text, include it after the letter.\n\n"
+    )
+
+    if question_text and question_text.strip():
+        prompt += f"Question context (if readable): {question_text}\n\n"
+
+    if answers:
+        prompt += "Known options (may or may not match image):\n"
+        for opt in answers:
+            prompt += f"- {opt}\n"
+
+    prompt += "\nRespond with the correct answer option (letter + text if visible)."
+
+    try:
+        logger.info(f"  > [Image Q{question_number}] Sending to Gemini Vision...")
+        response = model.generate_content([prompt, image])
+
+        # Rate limiting: 15 RPM = 4 seconds between requests
+        time.sleep(4)
+
+        answer = response.text.strip()
+
+        # Try to match with actual options
+        for opt in answers:
+            if answer.lower() in opt.lower() or opt.lower() in answer.lower():
+                logger.info(f"  > [Image Q{question_number}] Answer: {opt[:50]}...")
+                return opt
+
+        # If no match, return the raw response (might still work)
+        logger.info(f"  > [Image Q{question_number}] Raw answer: {answer[:50]}...")
+        return answer
+
+    except Exception as e:
+        logger.error(f"  > [Image Q{question_number}] Gemini Vision error: {e}")
+        return ""
 
 
 def test_gemini_api(api_key: str, model_name: str) -> bool:

@@ -155,13 +155,28 @@ class ExamScraper(BaseScraper):
                 opt_text = options.nth(j).inner_text().strip()
                 answers.append(opt_text)
 
+            # Detect if question has images
+            has_image = q_container.locator("img").count() > 0
+
+            # Capture image if present
+            image_data = None
+            if has_image:
+                try:
+                    image_data = q_container.screenshot()
+                    logger.info(
+                        f"    [Q{q_num_real}] Captured image ({len(image_data)} bytes)"
+                    )
+                except Exception as e:
+                    logger.warning(f"    [Q{q_num_real}] Failed to capture image: {e}")
+
             # Simpan data
             self.quizzes_data[q_num_real] = {
                 "question_text": q_text,
                 "answers": answers,
-                "has_image": False,  # TODO: Cek img tag jika perlu
-                "page_url": self.base_url,  # URL sama terus (Single Page App behavior)
-                "button_id": btn_id,  # Simpan ID tombol untuk navigasi saat save
+                "has_image": has_image,
+                "image_data": image_data,
+                "page_url": self.base_url,
+                "button_id": btn_id,
             }
 
         return self.quizzes_data
