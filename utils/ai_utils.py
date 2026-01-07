@@ -82,6 +82,68 @@ class RateLimiter:
 _rate_limiter = RateLimiter()
 
 
+def solve_captcha_with_vision(image_data: bytes, api_key: str, model_name: str) -> str:
+    """
+    Solve captcha using Gemini Vision.
+
+    Args:
+        image_data: Screenshot of captcha image as bytes (PNG)
+        api_key: Gemini API key
+        model_name: Gemini model name
+
+    Returns:
+        Captcha text, or empty string if failed
+    """
+    import io
+
+    import PIL.Image
+
+    genai.configure(api_key=api_key)
+
+    try:
+        model = genai.GenerativeModel(model_name)
+    except exceptions.NotFound:
+        logger.error(f"Gemini API Error: Model '{model_name}' not found")
+        return ""
+
+    # Convert bytes to PIL Image
+    image = PIL.Image.open(io.BytesIO(image_data))
+
+    prompt = (
+        "This is a captcha image. Read the text/characters in this captcha image. "
+        "Return ONLY the captcha text, no explanation, no extra characters. "
+        "The captcha is usually uppercase letters and/or numbers. "
+        "Example response: ABC123 or XYZW"
+    )
+
+    try:
+        _rate_limiter.wait_if_needed()
+
+        logger.info("  > Solving captcha with Gemini Vision...")
+
+        def make_request():
+            return model.generate_content([prompt, image])
+
+        success, response = _rate_limiter.backoff_retry(make_request)
+
+        if not success:
+            logger.error("  > Captcha solving failed after retries")
+            return ""
+
+        _rate_limiter.record_request()
+
+        captcha_text = response.text.strip().upper()
+        # Clean up any extra characters
+        captcha_text = "".join(c for c in captcha_text if c.isalnum())
+
+        logger.info(f"  > Captcha solved: {captcha_text}")
+        return captcha_text
+
+    except Exception as e:
+        logger.error(f"  > Captcha solving error: {e}")
+        return ""
+
+
 def _format_batch_prompt(quizzes: dict) -> str:
     prompt = (
         "Anda adalah seorang ahli yang sangat akurat dalam menjawab kuis pilihan ganda. "

@@ -90,7 +90,12 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
         # 1. Start Browser (Hanya sekali di awal)
         ScraperClass = get_scraper_class(url)
         logger.info(f"Initializing scraper: {ScraperClass.__name__}")
-        qz = ScraperClass(url, username, password)
+
+        # ExamScraper needs Gemini credentials for auto-captcha solving
+        if ScraperClass == ExamScraper:
+            qz = ScraperClass(url, username, password, gemini_api_key, gemini_model)
+        else:
+            qz = ScraperClass(url, username, password)
 
         part_counter = 1  # Untuk penamaan file cache per bagian (Bagian 1, 2, dst)
 

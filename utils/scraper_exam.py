@@ -11,7 +11,14 @@ from .scraper_base import BaseScraper
 
 
 class ExamScraper(BaseScraper):
-    def __init__(self, url: str, username: str, password: str):
+    def __init__(
+        self,
+        url: str,
+        username: str,
+        password: str,
+        gemini_api_key: str = None,
+        gemini_model: str = None,
+    ):
         # Init parent
         super().__init__(url, username, password)
 
@@ -25,36 +32,91 @@ class ExamScraper(BaseScraper):
         self.current_block_questions = []
 
         try:
-            self.login()
-            # Tidak ada "initialize attempt" khusus karena flow-nya linear setelah login
+            self.login(gemini_api_key, gemini_model)
         except Exception as e:
             logger.error(f"{e}")
             self.close()
             raise e
 
-    def login(self):
+    def login(self, gemini_api_key: str = None, gemini_model: str = None):
         """
-        Flow Login Hybrid:
-        1. Bot buka halaman login.
-        2. User input NPM, Password, Captcha MANUAL.
-        3. User tekan Enter di terminal untuk lanjut.
-        4. Bot menangani Pakta Integritas.
+        Automatic login with captcha solving using Gemini Vision.
+        Falls back to manual login if no API key provided.
+
+        Args:
+            gemini_api_key: API key for Gemini Vision captcha solving
+            gemini_model: Gemini model to use
         """
+        from utils.ai_utils import solve_captcha_with_vision
+
         logger.info(f"Membuka halaman login: {self.base_url}")
         self.page.goto(self.base_url)
+        self.page.wait_for_load_state("domcontentloaded")
 
-        # --- FASE MANUAL USER ---
-        print("\n" + "!" * 50)
-        logger.info("PERHATIAN: Website ini menggunakan Captcha Gambar.")
-        logger.info(
-            "Silakan isi NPM, Password, dan Captcha di Browser yang terbuka secara MANUAL."
-        )
-        logger.info("Klik 'Sign In' sampai berhasil masuk ke halaman Pakta Integritas.")
-        print("!" * 50)
+        # Check if we can auto-solve captcha
+        if gemini_api_key and gemini_model:
+            logger.info("Auto-login mode: solving captcha with Gemini Vision...")
 
-        input(
-            "\n>>> JIKA SUDAH LOGIN BERHASIL, TEKAN ENTER DI SINI UNTUK LANJUT... <<<"
-        )
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                logger.info(f"  > Login attempt {attempt + 1}/{max_attempts}")
+
+                # Fill credentials
+                self.page.fill("#txtNPM", self.username)
+                self.page.fill("#txtKey", self.password)
+
+                # Screenshot the captcha image
+                captcha_img = self.page.locator("#imgKode")
+                if captcha_img.is_visible():
+                    captcha_data = captcha_img.screenshot()
+
+                    # Solve captcha with Gemini Vision
+                    captcha_text = solve_captcha_with_vision(
+                        captcha_data, gemini_api_key, gemini_model
+                    )
+
+                    if captcha_text:
+                        self.page.fill("#txtKode", captcha_text)
+                        self.page.click("#btnLogin")
+                        self.page.wait_for_load_state("networkidle")
+
+                        # Check if login succeeded (not still on login page)
+                        if (
+                            "#pnlLogin" not in self.page.content()
+                            or "Pakta" in self.page.content()
+                        ):
+                            logger.info("✓ Login successful!")
+                            break
+                        else:
+                            logger.warning(
+                                "  > Login failed, retrying with new captcha..."
+                            )
+                            # Refresh captcha
+                            refresh_btn = self.page.locator("#btnRefresh")
+                            if refresh_btn.is_visible():
+                                refresh_btn.click()
+                                self.page.wait_for_load_state("networkidle")
+                    else:
+                        logger.warning("  > Captcha solving failed, refreshing...")
+                        refresh_btn = self.page.locator("#btnRefresh")
+                        if refresh_btn.is_visible():
+                            refresh_btn.click()
+                            self.page.wait_for_load_state("networkidle")
+        else:
+            # --- FALLBACK: MANUAL LOGIN ---
+            print("\n" + "!" * 50)
+            logger.info("PERHATIAN: Website ini menggunakan Captcha Gambar.")
+            logger.info(
+                "Silakan isi NPM, Password, dan Captcha di Browser yang terbuka secara MANUAL."
+            )
+            logger.info(
+                "Klik 'Sign In' sampai berhasil masuk ke halaman Pakta Integritas."
+            )
+            print("!" * 50)
+
+            input(
+                "\n>>> JIKA SUDAH LOGIN BERHASIL, TEKAN ENTER DI SINI UNTUK LANJUT... <<<"
+            )
 
         # --- FASE OTOMATIS (Pakta Integritas) ---
         logger.info("Memeriksa Pakta Integritas...")
@@ -75,9 +137,6 @@ class ExamScraper(BaseScraper):
                 "  > Halaman Pakta Integritas tidak ditemukan (Mungkin sudah lewat)."
             )
 
-        # Cek Halaman "Mulai Ujian" atau Halaman Soal Langsung
-        # Kadang ada halaman "Start" sebelum masuk ke soal nomor 1
-        # Kita asumsikan user sudah diposisi siap mengerjakan atau bot sudah di halaman soal
         logger.info("Siap melakukan scraping soal.")
 
     def fetch_all_quizzes(self) -> Dict[int, Dict[str, Any]]:
