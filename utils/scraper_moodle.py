@@ -245,30 +245,40 @@ class MoodleScraper(BaseScraper):
 
             page_success_count = 0
 
+            # 1. SCAN page sekaligus untuk build map (Optimization O(N))
+            logger.info("    Scanning page for questions...")
+            question_divs = self.page.locator(".que.multichoice")
+            count = question_divs.count()
+            dom_map = {}  # Key: cleaned_text_snippet, Value: Locator
+
+            for i in range(count):
+                q_div = question_divs.nth(i)
+                # Ambil text dari DOM sekali saja
+                raw_q_text = q_div.locator(".qtext").inner_text()
+                q_text_dom = clean_str(raw_q_text)
+                q_text_dom = re.sub(r"^[0-9]+\.\s*", "", q_text_dom)
+
+                # Gunakan 100 karakter pertama sebagai key lookup yang efisien
+                search_key = q_text_dom[:100]
+                dom_map[search_key] = q_div
+
+            # 2. ISI Jawaban (Lookup O(1))
+            page_success_count = 0
             for q_num, ans_text in q_map.items():
                 cache_q_text = self.quizzes_data[q_num]["question_text"]
-                search_key = clean_str(cache_q_text)[:30]
+                search_key = clean_str(cache_q_text)[:100]
 
-                # Cari div soal di DOM
-                question_divs = self.page.locator(".que.multichoice")
-                count = question_divs.count()
-                found_div = None
-
-                for i in range(count):
-                    q_div = question_divs.nth(i)
-                    q_text_dom = clean_str(q_div.locator(".qtext").inner_text())
-                    q_text_dom = re.sub(r"^[0-9]+\.\s*", "", q_text_dom)
-
-                    if search_key in q_text_dom:
-                        found_div = q_div
-                        break
+                # Cari di map yang sudah dibangun
+                found_div = dom_map.get(search_key)
 
                 if found_div:
                     ans_ai_clean = clean_str(ans_text)
                     options = found_div.locator(".answer div[class^='r']")
                     clicked = False
 
-                    for j in range(options.count()):
+                    # Loop opsi jawaban (jumlah opsi sedikit, jadi ok loop biasa)
+                    count_opts = options.count()
+                    for j in range(count_opts):
                         opt_row = options.nth(j)
                         label = opt_row.locator("label")
                         lbl_clean = clean_str(
@@ -288,8 +298,9 @@ class MoodleScraper(BaseScraper):
                     if not clicked:
                         logger.info(f"    [Gagal Match Opsi] Soal {q_num}")
                 else:
+                    # Fallback jika key lookup gagal (sangat jarang terjadi jika logic sama)
                     logger.info(
-                        f"    [Gagal HTML] Soal {q_num} tidak ditemukan di DOM."
+                        f"    [Gagal HTML] Soal {q_num} tidak ditemukan di DOM map."
                     )
 
             logger.info(f"    Berhasil mengisi {page_success_count} soal.")

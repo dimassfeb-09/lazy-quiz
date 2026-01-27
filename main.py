@@ -211,7 +211,7 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
 
             # --- FASE 3: PENGISIAN & SUBMIT ---
             if answers_to_fill:
-                logger.info("\n" + "=" * 40)
+                logger.info("=" * 40)
                 logger.info(f"FILLING SECTION {part_counter}...")
                 logger.info("=" * 40)
 
@@ -230,7 +230,10 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                 else:
                     is_safe = total_gagal == 0
                     if is_safe:
-                        prompt = f"Semua soal Bagian {part_counter} terisi. Lanjut Submit & Next Bagian? (y/n): "
+                        if isinstance(qz, ExamScraper):
+                            prompt = f"Semua soal Bagian {part_counter} terisi. Lanjut Submit & Next Bagian? (y/n): "
+                        else:
+                            prompt = f"Semua soal Bagian {part_counter} terisi. Siap Submit & Selesai? (y/n): "
                     else:
                         logger.warning(
                             f"⚠️  Warning: {total_gagal} questions empty in Part {part_counter}!"
@@ -249,6 +252,10 @@ def run_quiz_process(url, args, username, password, gemini_api_key, gemini_model
                 if do_submit:
                     logger.info(f"\n[Action] Submitting Part {part_counter}...")
                     qz.submit_final()
+
+                    if not isinstance(qz, ExamScraper):
+                        logger.info("Quiz submitted. Process complete.")
+                        break
 
                     # Beri waktu napas untuk loading halaman baru
                     logger.info("Waiting for next section to load...")
